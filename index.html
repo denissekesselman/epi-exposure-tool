@@ -1,0 +1,274 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Epi Exposure Window Tool</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 30px; }
+  label { display: block; margin-top: 15px; }
+  input, select { padding: 6px; margin-top: 5px; }
+  #result { margin-top: 25px; padding: 15px; border: 1px solid #ccc; background: #f7f7f7; }
+  .override-box { margin-top: 15px; padding: 12px; border: 1px solid #aaa; background: #fcfcfc; }
+</style>
+</head>
+<body>
+
+<h2>Epidemiologic Exposure Window Calculator</h2>
+
+<label>
+  Symptom Onset Date:
+  <input type="date" id="onsetDate">
+</label>
+
+<label>
+  Pathogen:
+  <select id="pathogen">
+    <option value="">-- Select Pathogen --</option>
+
+    <option value="Campy">Campylobacter</option>
+    <option value="Crypto">Cryptosporidium</option>
+    <option value="Cyclo">Cyclospora</option>
+    <option value="Dengue">Dengue</option>
+    <option value="Ebola">Ebola</option>
+    <option value="Giardia">Giardia</option>
+    <option value="HepA">Hepatitis A</option>
+    <option value="HepB">Hepatitis B</option>
+    <option value="HepC">Hepatitis C</option>
+    <option value="InfluenzaA">Influenza A</option>
+
+    <option value="Legionnaires">Legionnaire's Disease</option>
+    <option value="Pontiac">Pontiac Fever</option>
+
+    <option value="Measles">Measles</option>
+    <option value="Meningococcal">Meningococcal (Neisseria meningitidis)</option>
+    <option value="Mpox">Mpox</option>
+    <option value="Mumps">Mumps</option>
+    <option value="Norovirus">Norovirus</option>
+    <option value="Pertussis">Pertussis</option>
+    <option value="RSV">RSV</option>
+    <option value="Rubella">Rubella</option>
+    <option value="Salmonella">Salmonella</option>
+    <option value="STEC">STEC (Shiga toxin-producing E. coli)</option>
+    <option value="Shigella">Shigella</option>
+    <option value="Varicella">Varicella</option>
+    <option value="Vibrio">Vibrio</option>
+  </select>
+</label>
+
+<label>
+  <input type="checkbox" id="overrideToggle">
+  Override incubation range
+</label>
+
+<div id="overrideBox" class="override-box" style="display:none;">
+  <label>Min incubation:
+    <input type="number" id="overrideMin" step="0.1">
+  </label>
+  <label>Max incubation:
+    <input type="number" id="overrideMax" step="0.1">
+  </label>
+  <label>Unit:
+    <select id="overrideUnit">
+      <option value="hours">Hours</option>
+      <option value="days">Days</option>
+      <option value="weeks">Weeks</option>
+      <option value="months">Months</option>
+    </select>
+  </label>
+</div>
+
+<button id="calcBtn">Calculate Exposure Window</button>
+
+<div id="result"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+  // AUTO-ASSIGNED INCUBATION TABLE
+  const pathogenData = {
+
+    Campy: {
+      min: 1, max: 10, unit: "days",
+      typical: "2–5 days",
+      communicability: "Few days to a few weeks, or 72 hours after antibiotic treatment"
+    },
+    Crypto: {
+      min: 2, max: 14, unit: "days",
+      typical: "5–8 days",
+      communicability: "1–2 weeks"
+    },
+    Cyclo: {
+      min: 2, max: 14, unit: "days",
+      typical: "7 days",
+      communicability: "Days or weeks until oocysts become infective"
+    },
+    Dengue: {
+      min: 3, max: 14, unit: "days",
+      typical: "5–7 days",
+      communicability: "Day before symptom onset to ~5 days after"
+    },
+    Ebola: {
+      min: 2, max: 21, unit: "days",
+      typical: "21 days",
+      communicability: "From onset of symptoms"
+    },
+    Giardia: {
+      min: 3, max: 25, unit: "days",
+      typical: "7–10 days",
+      communicability: "Intermittently for months"
+    },
+    HepA: {
+      min: 15, max: 50, unit: "days",
+      typical: "28 days",
+      communicability: "Highest infectivity: 2-week period before jaundice"
+    },
+    HepB: {
+      min: 60, max: 150, unit: "days",
+      typical: "90 days",
+      communicability: "While HBV DNA is detectable"
+    },
+    HepC: {
+      min: 14, max: 180, unit: "days",
+      typical: "6–7 weeks",
+      communicability: "While HCV RNA detectable in blood"
+    },
+    InfluenzaA: {
+      min: 1, max: 4, unit: "days",
+      typical: "1–4 days",
+      communicability: "1 day before onset to 5–10 days after"
+    },
+
+    Legionnaires: {
+      min: 2, max: 10, unit: "days",
+      typical: "5–6 days",
+      communicability: "Not considered transmissible person-to-person"
+    },
+    Pontiac: {
+      min: 0.2, max: 2.75, unit: "days", // converting hours (5–66h)
+      typical: "24–48 hours",
+      communicability: "Not considered transmissible person-to-person"
+    },
+
+    Measles: {
+      min: 7, max: 21, unit: "days",
+      typical: "14 days",
+      communicability: "4 days prior to rash to 4 days after"
+    },
+    Meningococcal: {
+      min: 2, max: 10, unit: "days",
+      typical: "3–4 days",
+      communicability: "7 days prior to onset until 24 hours after antibiotics"
+    },
+    Mpox: {
+      min: 5, max: 21, unit: "days",
+      typical: "5–13 days",
+      communicability: "Until rash fully resolved and scabs gone"
+    },
+    Mumps: {
+      min: 12, max: 25, unit: "days",
+      typical: "16–18 days",
+      communicability: "Most infectious a few days before and after parotitis onset"
+    },
+    Norovirus: {
+      min: 0.5, max: 2, unit: "days", // 12–48 hours
+      typical: "33 hours",
+      communicability: "From onset of symptoms for at least 2 days after recovery"
+    },
+    Pertussis: {
+      min: 1, max: 21, unit: "days",
+      typical: "5–10 days",
+      communicability: "Most infectious during catarrhal period and first 2 weeks of cough"
+    },
+    RSV: {
+      min: 2, max: 8, unit: "days",
+      typical: "4–6 days",
+      communicability: "1–2 days before onset and 3–8 days after"
+    },
+    Rubella: {
+      min: 12, max: 23, unit: "days",
+      typical: "17 days",
+      communicability: "7 days before until 7 days after rash onset"
+    },
+    Salmonella: {
+      min: 0.25, max: 3, unit: "days", // 6–72 hours
+      typical: "12–36 hours",
+      communicability: "Days to months"
+    },
+    STEC: {
+      min: 1, max: 10, unit: "days",
+      typical: "3–4 days",
+      communicability: "May be shed for weeks even after symptoms resolve"
+    },
+    Shigella: {
+      min: 0.5, max: 4, unit: "days", // 12–96 hours
+      typical: "1–3 days",
+      communicability: "Typically within 4 weeks; carriers possible for months"
+    },
+    Varicella: {
+      min: 10, max: 21, unit: "days",
+      typical: "14–16 days",
+      communicability: "Until lesions crusted, usually 5–7 days"
+    },
+    Vibrio: {
+      min: 0.17, max: 4, unit: "days", // 4–96 hours
+      typical: "12–24 hours",
+      communicability: "Not person-to-person"
+    }
+  };
+
+  document.getElementById("overrideToggle").addEventListener("change", function() {
+    document.getElementById("overrideBox").style.display =
+      this.checked ? "block" : "none";
+  });
+
+  document.getElementById("calcBtn").addEventListener("click", function() {
+
+    const onsetInput = document.getElementById("onsetDate").value;
+    const pathogen = document.getElementById("pathogen").value;
+
+    if (!onsetInput || !pathogen) {
+      document.getElementById("result").innerHTML =
+        "<strong>Please select both onset date and pathogen.</strong>";
+      return;
+    }
+
+    let { min, max, unit, typical, communicability } = pathogenData[pathogen];
+
+    // Override logic
+    if (document.getElementById("overrideToggle").checked) {
+      min = parseFloat(document.getElementById("overrideMin").value);
+      max = parseFloat(document.getElementById("overrideMax").value);
+      unit = document.getElementById("overrideUnit").value;
+    }
+
+    const onsetDate = new Date(onsetInput);
+
+    function convertToHours(value, unit) {
+      if (unit === "hours") return value;
+      if (unit === "days") return value * 24;
+      if (unit === "weeks") return value * 24 * 7;
+      if (unit === "months") return value * 24 * 30;
+      return value;
+    }
+
+    const earliest = new Date(onsetDate.getTime() - convertToHours(max, unit) * 3600000);
+    const latest = new Date(onsetDate.getTime() - convertToHours(min, unit) * 3600000);
+
+    document.getElementById("result").innerHTML = `
+      <h3>Exposure Window</h3>
+
+      <strong>Earliest possible exposure:</strong> ${earliest.toDateString()} <br>
+      <strong>Latest possible exposure:</strong> ${latest.toDateString()} <br><br>
+
+      <strong>Incubation period used:</strong> ${min}–${max} ${unit}<br>
+      <strong>Typical incubation:</strong> ${typical}<br>
+      <strong>Period of communicability:</strong> ${communicability}<br>
+    `;
+  });
+
+});
+</script>
+
+</body>
+</htm
